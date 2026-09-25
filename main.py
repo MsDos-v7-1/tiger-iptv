@@ -1,62 +1,56 @@
-import os
+from flask import Flask, Response, request
 import requests
-from flask import Flask, Response, request, stream_with_context
 
 app = Flask(__name__)
 
-# Заголовки, притворяемся VLC-плеером на Windows
-HEADERS = {
-    "User-Agent": "VLC/3.0.18 LibVLC/3.0.18",
-    "Accept": "*/*",
-    "Connection": "keep-alive"
-}
-
-@app.route('/playlist.m3u')
-def get_playlist():
-    """Читает локальный файл playlist.m3u и перенаправляет ссылки через прокси"""
-    try:
-        if not os.path.exists('playlist.m3u'):
-            return "Файл playlist.m3u не найден!", 404
-
-        with open('playlist.m3u', 'r', encoding='utf-8', errors='ignore') as f:
-            lines = f.readlines()
-        
-        host_url = request.host_url.rstrip('/')
-        new_playlist = []
-
-        for line in lines:
-            clean_line = line.strip()
-            if clean_line.startswith("http://") or clean_line.startswith("https://"):
-                new_playlist.append(f"{host_url}/stream?url={clean_line}")
-            else:
-                new_playlist.append(clean_line)
-                
-        return Response("\n".join(new_playlist), content_type="text/plain; charset=utf-8")
-    except Exception as e:
-        return f"Ошибка обработки: {e}", 500
-
-@app.route('/stream')
-def proxy_stream():
-    """Проксирует поток с нужными заголовками"""
-    stream_url = request.args.get('url')
-    if not stream_url:
-        return "URL не указан", 400
-
-    def generate():
-        try:
-            with requests.get(stream_url, headers=HEADERS, stream=True, timeout=15) as r:
-                for chunk in r.iter_content(chunk_size=8192):
-                    if chunk:
-                        yield chunk
-        except Exception as e:
-            print(f"Ошибка потока: {e}")
-
-    return Response(stream_with_context(generate()), content_type="video/mp2t")
-
+# 1. Главная страница (чтобы не было 404)
 @app.route('/')
 def home():
-    return "Tiger IPTV Proxy is Running!", 200
-    
+    return "Tiger IPTV Proxy is Running! Use /playlist.m3u to get channels.", 200
+
+# 2. Выдача обработанного плейлиста
+@app.route('/playlist.m3u')
+def get_playlist():
+    try:
+        with open("playlist.m3u", "r", encoding="utf-8") as f:
+            content = f.read()
+        
+        domain = request.host_url.rstrip('/')
+        lines = content.splitlines()
+        new_lines = []
+        
+        for line in lines:
+            line = line.strip()
+            if line.startswith("http://") or line.startswith("https://"):
+                # Перенаправляем поток через наш прокси
+                new_lines.append(f"{domain}/stream?url={line}")
+            else:
+                new_lines.append(line)
+                
+        return Response("\n".join(new_lines), mimetype="text/plain")
+    except Exception as e:
+        return Response(f"Error loading playlist: {str(e)}", status_code=500)
+
+# 3. Проксирование самого видеопотока
+@app.route('/stream')
+def proxy_stream():
+    url = request.args.get('url')
+    if not url:
+        return "No URL provided", 400
+
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+    }
+
+    try:
+        req = requests.get(url, headers=headers, stream=True, timeout=10)
+        return Response(
+            req.iter_content(chunk_size=1024 * 64),
+            content_type=req.headers.get('content-type', 'video/mp2t'),
+            status=req.status_code
+        )
+    except Exception as e:
+        return Response(f"Stream Error: {str(e)}", status_code=500)
+
 if __name__ == '__main__':
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host='0.0.0.0', port=port)
+    app.run(host='0.0.0.0', port=10000)
