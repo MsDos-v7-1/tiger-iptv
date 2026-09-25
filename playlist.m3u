@@ -30,7 +30,9 @@ http://tvzvezda.bonus-tv.ru/cdn/zvezdaplus/playlist.m3u8
 #EXTINF:-1 tvg-id="Izvestia.ru@SD" tvg-logo="https://i.imgur.com/r5HzA6J.png" group-title="News",24. Известия
 http://igi-hls.cdnvideo.ru/igi/igi_tcode/playlist.m3u8
 #EXTINF:-1 group-title="Общие",Россия 1
-http://46.174.167.33/russia1/index.m3u8
+https://server1.musical.uz/russia1/tracks-v1a1/mono.m3u8?remote=188.237.186.108&token=d461e94d7088f52011b9608a5c58e35b5a549308-a2efc9b263604a30784dd17f3c42705a-1790356190-1790345390
+#EXTINF:-1 group-title="Общие", НТВ
+https://server.musical.uz/ntvhd_web/tracks-v1a1/mono.m3u8?remote=188.237.186.108&token=f66e6ff47ec1cf2fa69fd3ad5b592422b2950311-5bf80e6a6ff496fb410d928d661c2beb-1790356498-1790345698
 #EXTINF:-1 tvg-id="Konniymir.ru@SD" tvg-logo="https://i.imgur.com/X6otbK0.png" group-title="Outdoor",27. Конный Мир
 https://cdn-01.bonus-tv.ru/kmir/playlist.m3u8
 #EXTINF:-1 tvg-id="Eurasia.ru@SD" tvg-logo="https://i.imgur.com/4JUHIVS.png" group-title="General",28. Евразия (Орск) (720p)
