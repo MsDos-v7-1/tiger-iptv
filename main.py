@@ -3,12 +3,10 @@ import requests
 
 app = Flask(__name__)
 
-# 1. Главная страница (чтобы не было 404)
 @app.route('/')
 def home():
-    return "Tiger IPTV Proxy is Running! Use /playlist.m3u to get channels.", 200
+    return "Tiger IPTV Proxy is Running!", 200
 
-# 2. Выдача обработанного плейлиста
 @app.route('/playlist.m3u')
 def get_playlist():
     try:
@@ -22,7 +20,6 @@ def get_playlist():
         for line in lines:
             line = line.strip()
             if line.startswith("http://") or line.startswith("https://"):
-                # Перенаправляем поток через наш прокси
                 new_lines.append(f"{domain}/stream?url={line}")
             else:
                 new_lines.append(line)
@@ -31,7 +28,6 @@ def get_playlist():
     except Exception as e:
         return Response(f"Error loading playlist: {str(e)}", status_code=500)
 
-# 3. Проксирование самого видеопотока
 @app.route('/stream')
 def proxy_stream():
     url = request.args.get('url')
@@ -39,14 +35,21 @@ def proxy_stream():
         return "No URL provided", 400
 
     headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept": "*/*",
+        "Connection": "keep-alive"
     }
 
     try:
-        req = requests.get(url, headers=headers, stream=True, timeout=10)
+        # verify=False отключает strict SSL ошибки, timeout прерывает мертвые потоки
+        req = requests.get(url, headers=headers, stream=True, timeout=10, verify=False)
+        
+        # Передаем заголовки источника обратно клиенту
+        content_type = req.headers.get('Content-Type', 'application/vnd.apple.mpegurl')
+        
         return Response(
             req.iter_content(chunk_size=1024 * 64),
-            content_type=req.headers.get('content-type', 'video/mp2t'),
+            content_type=content_type,
             status=req.status_code
         )
     except Exception as e:
