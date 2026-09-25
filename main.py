@@ -53,6 +53,10 @@ def proxy_stream():
 
     return Response(stream_with_context(generate()), content_type="video/mp2t")
 
+@app.route('/')
+def home():
+    return "Tiger IPTV Proxy is Running!", 200
+    
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
     app.run(host='0.0.0.0', port=port)
