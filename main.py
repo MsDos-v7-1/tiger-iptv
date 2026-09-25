@@ -1,5 +1,9 @@
 from flask import Flask, Response, request
 import requests
+from urllib.parse import urljoin, quote, unquote
+import urllib3
+
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 app = Flask(__name__)
 
@@ -20,7 +24,9 @@ def get_playlist():
         for line in lines:
             line = line.strip()
             if line.startswith("http://") or line.startswith("https://"):
-                new_lines.append(f"{domain}/stream?url={line}")
+                # Кодируем URL, чтобы спецсимволы не ломали запросы
+                encoded_url = quote(line, safe='')
+                new_lines.append(f"{domain}/stream?url={encoded_url}")
             else:
                 new_lines.append(line)
                 
@@ -30,26 +36,43 @@ def get_playlist():
 
 @app.route('/stream')
 def proxy_stream():
-    url = request.args.get('url')
-    if not url:
+    raw_url = request.args.get('url')
+    if not raw_url:
         return "No URL provided", 400
+
+    target_url = unquote(raw_url)
 
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Accept": "*/*",
-        "Connection": "keep-alive"
+        "Accept": "*/*"
     }
 
     try:
-        # verify=False отключает strict SSL ошибки, timeout прерывает мертвые потоки
-        req = requests.get(url, headers=headers, stream=True, timeout=10, verify=False)
-        
-        # Передаем заголовки источника обратно клиенту
-        content_type = req.headers.get('Content-Type', 'application/vnd.apple.mpegurl')
-        
+        req = requests.get(target_url, headers=headers, stream=True, timeout=10, verify=False)
+        content_type = req.headers.get('Content-Type', '')
+
+        # Если это m3u8 плейлист — переписываем внутри него пути к сегментам
+        if 'mpegurl' in content_type or 'apple' in content_type or target_url.endswith('.m3u8'):
+            text_content = req.text
+            domain = request.host_url.rstrip('/')
+            
+            new_lines = []
+            for line in text_content.splitlines():
+                line_str = line.strip()
+                if line_str and not line_str.startswith('#'):
+                    # Преобразуем относительную ссылку в абсолютную
+                    abs_url = urljoin(target_url, line_str)
+                    encoded_segment = quote(abs_url, safe='')
+                    new_lines.append(f"{domain}/stream?url={encoded_segment}")
+                else:
+                    new_lines.append(line)
+            
+            return Response("\n".join(new_lines), mimetype="application/vnd.apple.mpegurl")
+
+        # Если это бинарный видеосегмент (.ts / .aac и т.д.) — проксируем как есть
         return Response(
             req.iter_content(chunk_size=1024 * 64),
-            content_type=content_type,
+            content_type=content_type or 'video/mp2t',
             status=req.status_code
         )
     except Exception as e:
